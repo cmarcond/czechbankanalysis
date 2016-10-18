@@ -1,33 +1,98 @@
 ---
-title: "Exemplo"
+title: "Trabalho Final - Analise de Dados em R - CZECH BANK"
+author: 
+- Author "Edna Nakano"
+- Author "Cesar Marcondes - Matrícula 079149/2016"
+- Author "Cecilia Kimura"
+date: "`r format(Sys.time(), '%d %B %Y')`"
 output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-knitr::opts_knit$set(root.dir = "/Users/cesar/MyCase")
+knitr::opts_knit$set(root.dir = "czechdata")
 ```
 
-## Relatorio Final
+# Relatorio Final
 
-Vamos pensar num teste de hipótese que podemos propor para o dono do banco.
-Um case que o pessoal está usando é para análise de crédito. Mas começa lá no banco de Loan, vai a a Account e amarrando com Disposition.
-Note algumas chaves account_id e cliente_id.
+A análise de dados sendo realizada nesse trabalho tenta melhorar o entendimento
+de como é o perfil dos clientes de bancos. Estamos particularmente interessados 
+em encontrar características dos clientes que possuem cartão de 
+crédito, e encontrar indicadores de empréstimos e cartões bons e ruins.
+
+O projeto esta estruturado nas seguintes fases:
+
+* Limpeza dos Dados
+* Estudo de Grupos de Dados
+* Testes de Hipotese
+* Previsão usando Regressão
+
+## Limpeza dos Dados
+
+Iniciamos carregando as bibliotecas (dplyr e ggplot2) e também 
+carregando os bancos de dados que iremos trabalhar. Os arquivos 
+que compõem o dataset são: account, card, client, disp, district,
+loan, order e trans.asc. Todos os arquivos estão em formato ascii
+e possuem como separador de campos o simbolo ";". O maior arquivo 
+é o trans.asc que possui 1.056.320 objetos e 66 MB de tamanho. 
+Usaremos o mesmo nome do arquivo para criar os DataFrame no R.
 
 ```{r message = FALSE, warning = FALSE, error = FALSE}
 library(dplyr)
 library(ggplot2)
+account <- tbl_df(read.csv("account.asc", 
+		sep = ";", stringsAsFactors = FALSE))
+card <- tbl_df(read.csv("card.asc",
+		sep = ";", stringsAsFactors = FALSE))
+client <- tbl_df(read.csv("client.asc", 
+		sep = ";", stringsAsFactors = FALSE))
+disp <- tbl_df(read.csv("disp.asc",
+		sep = ";", stringsAsFactors = FALSE))
+district <- tbl_df(read.csv("district.asc",
+		sep = ";", stringsAsFactors = FALSE))  
+loan <- tbl_df(read.csv("loan.asc", 
+		sep = ";", stringsAsFactors = FALSE))
+order <- tbl_df(read.csv("loan.asc",
+		sep = ";", stringsAsFactors = FALSE))
+trans <- tbl_df(read.csv("loan.asc",
+		sep = ";", stringsAsFactors = FALSE, nrows=50000)) 
 ```
 
-Testes iniciais:
-* Checar duplicados
-* 
+### Base de dados Account
+
+Iniciamos a limpeza de dados por Account. Podemos observar que 
+existe um campo chamado Frequency, que representa  a frequencia com 
+que a conta criar extratos para o correntista, pode ser mensal,
+semanal ou a cada transacao. Alteramos os nomes em Tcheco para ingles
+para simplicar a visualizacao e entendimento. E também convertemos 
+esse campo para fator, pois só existem 3 fatores.
 
 ```{r}
-account <- tbl_df(read.csv("account.csv", 
-          sep = ",", stringsAsFactors = FALSE))
-str(account)
+names(account)[3] <- paste("statement")
+account$statement <- gsub("POPLATEK MESICNE", "monthly", account$statement)
+account$statement <- gsub("POPLATEK TYDNE", "weekly", account$statement)
+account$statement <- gsub("POPLATEK PO OBRATU", "pertransaction", account$statement)
+account$statement <- as.factor(account$statement)
 ```
+
+Tambem convertemos as datas para o formato de datas no R.
+```{r}
+account$date <- as.Date(paste(account$date), "%y%m%d")
+```
+
+A seguir podemos ver algumas características das contas.
+```{r fig.align='center', fig.height = 4, fig.width = 4}
+p <- ggplot(data = account, aes(x = statement))
+p <- p + geom_bar(aes(y = (..count..)/sum(..count..)))
+p + scale_y_continuous("percent")
+```
+Vamos pensar num teste de hipótese que podemos propor para o dono do banco.
+Um case que o pessoal está usando é para análise de crédito. 
+Mas começa lá no banco de Loan, vai a a Account e amarrando com Disposition.
+Note algumas chaves account_id e cliente_id.
+
+Testes iniciais:
+Checar duplicados
 
 Texto
 
@@ -39,7 +104,8 @@ sum(duplicated(account))
 1)	Carregando "Loan"
 
 ```{r}
-loan <- tbl_df(read.csv("loan.csv", sep = ";", stringsAsFactors = FALSE))
+loan <- tbl_df(read.csv("loan.asc", 
+			sep = ";", stringsAsFactors = FALSE))
 str(loan)
 head(loan)
 sum(duplicated(loan))
@@ -82,8 +148,10 @@ COLOCAR AQUI
 Disposition faz o relacionamento entre conta, cliente e cartao de credito.
 Obter uma lista de account com disposition via inner_join
 ```{r}
-disposition = tbl_df(read.csv("disp.csv",sep = ";", stringsAsFactors = FALSE))
-card = tbl_df(read.csv("card.csv",sep = ";", stringsAsFactors = FALSE))
+disposition = tbl_df(read.csv("disp.asc",
+			sep = ";", stringsAsFactors = FALSE))
+card = tbl_df(read.csv("card.asc",
+			sep = ";", stringsAsFactors = FALSE))
 
 acc_ok_disp_card <- acc_ok %>%
   inner_join(disposition, by = c("account_id")) %>%
@@ -118,7 +186,8 @@ right_join(acc_ok_disp_card, card, by = c('disp_id'))
 ## Entendendo melhor os clientes
 
 ```{r}
-client <- tbl_df(read.csv("client.csv", sep = ";", stringsAsFactors = FALSE))
+client <- tbl_df(read.csv("client.asc", 
+			  sep = ";", stringsAsFactors = FALSE))
 good_clients_data = inner_join(acc_ok_disp, client, by = c('client_id'))
 good_clients_data <- good_clients_data %>%
   mutate(mesajustado = as.numeric(stringr::str_sub(birth_number,3,4))) %>%
@@ -163,320 +232,9 @@ good_clients_data %>%
 
 Temos muitos bons pagadores no distrito 1. Será um dado faltando? 
 ```{r}
-demograph = tbl_df(read.csv("district.csv",sep = ";", stringsAsFactors = FALSE))
+demograph = tbl_df(read.csv("district.asc",
+				sep = ";", stringsAsFactors = FALSE))
 str(demograph)
 demograph %>% 
   filter(A1 == 1)
 ```
-
-Começar a analisar transações
-```{r}
-transactions <- tbl_df(read.csv("short_transaction.csv", sep = ";", stringsAsFactors = FALSE))
-transactions <- transactions %>%
-  mutate(mes = as.numeric(stringr::str_sub(date,3,4))) %>%
-  mutate(ano = as.numeric(stringr::str_sub(date,1,2))) %>%
-  mutate(dia = as.numeric(stringr::str_sub(date,5,6)))
-min(transactions$ano)
-max(transactions$ano)
-```
-
-Separando os anos de 1993 e 1994
-```{r}
-transactions93 <- transactions %>%
-  filter(ano == 93)
-
-transactions94 <- transactions %>%
-  filter(ano == 94)
-```
-
-Plotar por mes
-```{r}
-ggplot(transactions, aes(mes, col = as.factor(ano))) +
- geom_bar()
-```
-Vamos acumular as quantidades "amounts" das transações por mes/ano
-```{r}
-transactions93 %>%
-  group_by(as.factor(mes)) %>% 
-  summarise(soma = sum(amount))
-```
-
-
-<!--
-betterDates <- as.Date(transactions$date, format = "%y%m%d")
-betterDates
-
-
-betterDates <- as.Date(transactions$date, format = "%y%m%d")
-head(betterDates)
-ggplot(transactions, aes(amount, balance)) +
- geom_point(aes(color = type), alpha = 0.5)
-
-
-Mas qual o tipo de cartão propor?  Tem que entender quem são os clientes?
-> client = tbl_df(read.csv("client.csv",sep = ";", stringsAsFactors = FALSE))
-
-> good_clients_data = inner_join(good_clients, client, by = c('client_id'))
-
-Para pegar um subset do string, usei o comando 
-> stringr::str_sub(goog_clients_data$birth_number,3,4)
-
-[697] "55" "60" "06" "51" "03" "55" "07" "62" "11" "52" "59" "55"
-[709] "55" "11" "10" "53" "51" "51" "51" "03" "08" "12" "02" "02"
-[721] "62" "01" "57" "55" "60" "02" "01" "53" "01" "03" "61" "51"
-[733] "12" "01" "03" "03" "01" "54" "01" "10" "62" "52" "08" "56"
-[745] "52" "01" "51" "11" "10" "61" "09"
-
-Deu certo, mas preciso ajustar para ficar como data frame. Ficou bom. 
-	Cliente		disp_id	birth_number	district_id
-47
-11362
-11054
-665111
-51
-748
-12308
-12000
-781129
-64
-749
-333
-333
-711019
-38
-750
-1130
-1130
-406126
-70
-751
-1594
-1594
-390929
-56
- 
-Acho que deu certo. Fiz um arquivo pequeno(cliente_peq) para testar.
-> mutate (client_peq,month = stringr::str_sub(client_peq$birth_number,3,4) )
-# A tibble: 20 × 4
-   client_id birth_number district_id month
-       <int>        <int>       <int> <chr>
-1          1       706213          18    62
-2          2       450204           1    02
-3          3       406009           1    60
-4          4       561201           5    12
-5          5       605703           5    57
-6          6       190922          12    09
-7          7       290125          15    01
-8          8       385221          51    52
-9          9       351016          60    10
-10        10       430501          57    05
-11        11       505822          57    58
-12        12       810220          40    02
-13        13       745529          54    55
-14        14       425622          76    56
-15        15       185828          21    58
-16        16       190225          21    02
-17        17       341013          76    10
-18        18       315405          76    54
-19        19       421228          47    12
-20        20       790104          46    01
-15        15       185828          21    58
-16        16       190225          21    02
-17        17       341013          76    10
-18        18       315405          76    54
-19        19       421228          47    12
-20        20       790104          46    01
-
-Agora as 3 colunas
-> mutate (client_peq,year = stringr::str_sub(client_peq$birth_number,1,2), month = stringr::str_sub(client_peq$birth_number,3,4), day = stringr::str_sub(client_peq$birth_number,5,6) )
-
-# A tibble: 20 × 6
-   client_id birth_number district_id  year month   day
-       <int>        <int>       <int> <chr> <chr> <chr>
-1          1       706213          18    70    62    13
-2          2       450204           1    45    02    04
-3          3       406009           1    40    60    09
-4          4       561201           5    56    12    01
-5          5       605703           5    60    57    03
-6          6       190922          12    19    09    22
-7          7       290125          15    29    01    25
-8          8       385221          51    38    52    21
-9          9       351016          60    35    10    16
-10        10       430501          57    43    05    01
-11        11       505822          57    50    58    22
-12        12       810220          40    81    02    20
-13        13       745529          54    74    55    29
-14        14       425622          76    42    56    22
-15        15       185828          21    18    58    28
-16        16       190225          21    19    02    25
-17        17       341013          76    34    10    13
-18        18       315405          76    31    54    05
-19        19       421228          47    42    12    28
-20        20       790104          46    79    01    04
-
-Agora vou tentar no client grande. 
-> mutate (client,year = stringr::str_sub(client$birth_number,1,2), month = stringr::str_sub(client$birth_number,3,4), day = stringr::str_sub(client$birth_number,5,6) )
-# A tibble: 5,369 × 6
-   client_id birth_number district_id  year month   day
-       <int>        <int>       <int> <chr> <chr> <chr>
-1          1       706213          18    70    62    13
-2          2       450204           1    45    02    04
-3          3       406009           1    40    60    09
-4          4       561201           5    56    12    01
-5          5       605703           5    60    57    03
-6          6       190922          12    19    09    22
-7          7       290125          15    29    01    25
-8          8       385221          51    38    52    21
-9          9       351016          60    35    10    16
-10        10       430501          57    43    05    01
-# ... with 5,359 more rows
-Deu certo. Mas ficou como char. Vou mudar para numérico.
-> client_peq_YMD$year = as.numeric(client_peq_YMD$year) 
-> client_peq_YMD$month = as.numeric(client_peq_YMD$month) 
-> client_peq_YMD$day = as.numeric(client_peq_YMD$day) 
-
- Agora vou tratar.
- > ageCalculator <- function(age){
-+       if(age > 50) {
-+         newage  <- age - 50 
-+     }else {newage = age}
-+     round(newage)
-+ }
-
-Como fazer um loop?
-# Função Calcula Mes
-calcula_mes = function(month,add)
-for(i in month){
-    if (month > 50){
-      add = "F"}  
-    else
-    {add = "M"} 
-}     
-Mas está dando problema. 
-> calcula_mes(client_peq_Y1$month,client_peq_Y1$add)
-20: In if (month > 50) { ... :
-  the condition has length > 1 and only the first element will be used
-
- 
- O problema é que o IF não funciona para vetor.  
-Então vou fazer um filter.
-Primeiro ler cilent
-> client = tbl_df(read.csv("client.csv",sep = ";", stringsAsFactors = FALSE))
-
-
-Criar as colunas
-> client_2 = mutate (client,year = stringr::str_sub(client$birth_number,1,2), month = stringr::str_sub(client$birth_number,3,4), day = stringr::str_sub(client$birth_number,5,6) )
-
-> client_2$year = as.numeric(client_2$year)
-> client_2$month = as.numeric(client_2$month) 
-> client_2$day = as.numeric(client_2$day) 
-
-
-
- E agora o filtro
-> filter (client_2, month < 50) 
-# A tibble: 2,724 × 6
-   client_id birth_number district_id  year month   day
-       <int>        <int>       <int> <dbl> <dbl> <dbl>
-1          2       450204           1    45     2     4
-2          4       561201           5    56    12     1
-3          6       190922          12    19     9    22
-4          7       290125          15    29     1    25
-5          9       351016          60    35    10    16
-6         10       430501          57    43     5     1
-7         12       810220          40    81     2    20
-8         16       190225          21    19     2    25
-9         17       341013          76    34    10    13
-10        19       421228          47    42    12    28
-# ... with 2,714 more rows
-
-> client_men =  filter (client_2, month < 50) 
-> client_women =  filter (client_2, month > 50) 
-> write.csv2 (client_men, file = "client_men.csv")
-> write.csv2 (client_women, file = "client_women.csv")
-
-> client_women2 = mutate(client_women, month2 = month - 50, sex = "F")
-> client_women2 [-2]
-# A tibble: 2,645 × 7
-   client_id district_id  year month   day month2   sex
-       <int>       <int> <dbl> <dbl> <dbl>  <dbl> <chr>
-1          1          18    70    62    13     12     F
-2          3           1    40    60     9     10     F
-3          5           5    60    57     3      7     F
-4          8          51    38    52    21      2     F
-5         11          57    50    58    22      8     F
-6         13          54    74    55    29      5     F
-7         14          76    42    56    22      6     F
-8         15          21    18    58    28      8     F
-9         18          76    31    54     5      4     F
-10        21          12    52    60    29     10     F
-# ... with 2,635 more rows
-
-> client_men2 [-2]
-# A tibble: 2,724 × 7
-   client_id district_id  year month   day month2   sex
-       <int>       <int> <dbl> <dbl> <dbl>  <dbl> <chr>
-1          2           1    45     2     4      2     M
-2          4           5    56    12     1     12     M
-3          6          12    19     9    22      9     M
-4          7          15    29     1    25      1     M
-5          9          60    35    10    16     10     M
-6         10          57    43     5     1      5     M
-7         12          40    81     2    20      2     M
-8         16          21    19     2    25      2     M
-9         17          76    34    10    13     10     M
-10        19          47    42    12    28     12     M
-# ... with 2,714 more rows
-
-> write.csv2 (client_men2, file = "client_men2.csv")
-> write.csv2 (client_women2, file = "client_women2.csv")
-
-> good_clients = select (acc_ok_disp,client_id,disp_id)
-
-Fazendo o join de good_client com o cliente_men2 e também com wonen_2
-> good_clients_data = inner_join(good_clients, client_men2, by = c('client_id'))
-> good_clients_data_wonem = inner_join(good_clients, client_women2, by = c('client_id'))
-
- 
-
-> inner_join(good_clients_data_wonem, card, by = c('disp_id'))
-# A tibble: 83 × 12
-   client_id disp_id birth_number district_id  year month   day
-       <int>   <int>        <int>       <int> <dbl> <dbl> <dbl>
-1       2235    2235       405420          14    40    54    20
-2      11409   11101       805502          32    80    55     2
-3       9593    9285       685128          74    68    51    28
-4      12396   12088       705117          62    70    51    17
-5       5366    5366       715920          60    71    59    20
-6       6178    6178       406015           1    40    60    15
-7       6301    6301       495308          55    49    53     8
-8      10095    9787       765206           1    76    52     6
-9       2623    2623       655716          16    65    57    16
-10      7286    7286       705210          47    70    52    10
-# ... with 73 more rows, and 5 more variables: month2 <dbl>,
-#   sex <chr>, card_id <int>, type <chr>, issued <chr>
-
-Ou seja, das 376 mulheres boas pagadoras, somente 83 tem cartões. 
-> inner_join(good_clients_data, card, by = c('disp_id'))
-# A tibble: 82 × 12
-   client_id disp_id birth_number district_id  year month   day
-       <int>   <int>        <int>       <int> <dbl> <dbl> <dbl>
-1       7127    7127       570929           3    57     9    29
-2       6789    6789       790326          57    79     3    26
-3      13539   13231       780907          63    78     9     7
-4      10198    9890       760524          31    76     5    24
-5      13201   12893       370517          31    37     5    17
-6       3687    3687       720206          49    72     2     6
-7      11195   10887       531205          58    53    12     5
-8       5911    5911       351003          14    35    10     3
-9      10043    9735       651029          45    65    10    29
-10      7576    7576       620710          38    62     7    10
-# ... with 72 more rows, and 5 more variables: month2 <dbl>,
-#   sex <chr>, card_id <int>, type <chr>, issued <chr>
-
-E dos 375 homens bons pagadoras, somente 82  tem cartões.
-Esse número bate com o visto anteriormente.
-
-	Considerar dos bons pagadores quem tem realmente condições de pagar um cartão e qual cartão oferecer.
-
--->
