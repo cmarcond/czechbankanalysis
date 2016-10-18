@@ -40,6 +40,7 @@ Usaremos o mesmo nome do arquivo para criar os DataFrame no R.
 ```{r message = FALSE, warning = FALSE, error = FALSE}
 library(dplyr)
 library(ggplot2)
+library(gridExtra)
 account <- tbl_df(read.csv("account.asc", 
 		sep = ";", stringsAsFactors = FALSE))
 card <- tbl_df(read.csv("card.asc",
@@ -60,11 +61,15 @@ trans <- tbl_df(read.csv("loan.asc",
 
 ### Base de dados Account
 
+```{r}
+str(account)
+```
+
 Iniciamos a limpeza de dados por Account. Podemos observar que 
 existe um campo chamado Frequency, que representa  a frequencia com 
-que a conta criar extratos para o correntista, pode ser mensal,
+que a conta cria extratos para o correntista, pode ser mensal,
 semanal ou a cada transacao. Alteramos os nomes em Tcheco para ingles
-para simplicar a visualizacao e entendimento. E também convertemos 
+para simplicar a visualizacao e o entendimento. E também convertemos 
 esse campo para fator, pois só existem 3 fatores.
 
 ```{r}
@@ -76,16 +81,61 @@ account$statement <- as.factor(account$statement)
 ```
 
 Tambem convertemos as datas para o formato de datas no R.
+E fizemos o agrupamento dos dados das contas por ano e mes, de modo
+a mostrar a evolução do crescimento do numero de contas ao longo dos 
+5 anos do dataset. Notamos que nos anos de 1993 e 1996 houve um crescimento
+maior de numero de contas.
 ```{r}
 account$date <- as.Date(paste(account$date), "%y%m%d")
+acc_time <- account %>%
+	mutate(month = format(date, "%m"), year = format(date, "%Y")) %>%
+	group_by(year, month) %>%
+	summarise(total = n()) %>%
+	mutate(yearmonth = paste(year, month))
 ```
 
-A seguir podemos ver algumas características das contas.
-```{r fig.align='center', fig.height = 4, fig.width = 4}
-p <- ggplot(data = account, aes(x = statement))
-p <- p + geom_bar(aes(y = (..count..)/sum(..count..)))
-p + scale_y_continuous("percent")
+A seguir podemos ver essas características das contas, visualmente.
+As contas também estao bem distribuídas (quase uniformemente) nos diferentes distritos. 
+```{r message=FALSE, fig.align='center', fig.height = 3, fig.width = 8}
+p1 <- ggplot(account, aes(x = statement))
+p1 <- p1 + geom_bar(aes(y = (..count..)/sum(..count..)))
+p1 <- p1 + scale_y_continuous("percent")
+
+p2 <- ggplot(acc_time, aes(factor(year), total))
+p2 <- p2 + geom_boxplot()
+p2 <- p2 + xlab("Year") + ylab("#Account") 
+
+p3 <- ggplot(account, aes(x = district_id))
+p3 <- p3 + stat_bin(bins = 20)
+p3 <- p3 + geom_histogram()
+grid.arrange(p1, p2, p3, ncol=3)
 ```
+
+### Base de dados Client
+
+```{r}
+str(client)
+```
+
+A limpeza de dados por Client consiste basicamente em criar uma nova coluna
+contendo o genero dos clientes, masculino ou feminino, e também converter as 
+datas de nascimento para um formato de datas no R.
+
+```{r}
+client <- client %>%
+	mutate(mesajustado = as.numeric(stringr::str_sub(birth_number,3,4))) %>%
+	mutate(sex = ifelse(mesajustado > 50, "F", "M")) %>%
+	mutate(birth_number= ifelse(sex=="F", birth_number - 5000, birth_number))
+head(client)
+account$birth_number <- as.Date(paste(account$date), "%y%m%d")>
+```
+
+. Podemos observar que
+  existe um campo chamado Frequency, que representa  a frequencia com
+  ! que a conta cria extratos para o correntista, pode ser mensal,
+    semanal ou a cada transacao. Alteramos os nomes em Tcheco para ingles
+    ! para simplicar a visualizacao e o entendimento. E também convertemos
+      esse campo para fator, pois só existem 3 fatores.
 Vamos pensar num teste de hipótese que podemos propor para o dono do banco.
 Um case que o pessoal está usando é para análise de crédito. 
 Mas começa lá no banco de Loan, vai a a Account e amarrando com Disposition.
