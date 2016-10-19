@@ -41,6 +41,8 @@ Usaremos o mesmo nome do arquivo para criar os DataFrame no R.
 library(dplyr)
 library(ggplot2)
 library(gridExtra)
+library(lubridate)
+library(scales)
 account <- tbl_df(read.csv("account.asc", 
 		sep = ";", stringsAsFactors = FALSE))
 card <- tbl_df(read.csv("card.asc",
@@ -95,7 +97,7 @@ acc_time <- account %>%
 ```
 
 A seguir podemos ver essas características das contas, visualmente.
-As contas também estao bem distribuídas (quase uniformemente) nos diferentes distritos. 
+As contas também estao distribuídas (quase uniformemente) nos diferentes distritos. 
 ```{r message=FALSE, fig.align='center', fig.height = 3, fig.width = 8}
 p1 <- ggplot(account, aes(x = statement))
 p1 <- p1 + geom_bar(aes(y = (..count..)/sum(..count..)))
@@ -125,17 +127,109 @@ datas de nascimento para um formato de datas no R.
 client <- client %>%
 	mutate(mesajustado = as.numeric(stringr::str_sub(birth_number,3,4))) %>%
 	mutate(sex = ifelse(mesajustado > 50, "F", "M")) %>%
-	mutate(birth_number= ifelse(sex=="F", birth_number - 5000, birth_number))
-head(client)
-account$birth_number <- as.Date(paste(account$date), "%y%m%d")>
+	mutate(birth_number = ifelse(sex=="F", birth_number - 5000, birth_number))
+client$birth_number <- paste0("19", client$birth_number)
+client$birth_number <- as.Date(client$birth_number, "%Y%m%d")
 ```
 
-. Podemos observar que
-  existe um campo chamado Frequency, que representa  a frequencia com
-  ! que a conta cria extratos para o correntista, pode ser mensal,
-    semanal ou a cada transacao. Alteramos os nomes em Tcheco para ingles
-    ! para simplicar a visualizacao e o entendimento. E também convertemos
-      esse campo para fator, pois só existem 3 fatores.
+Podemos plotar a variação de idade dos grupos feminino e masculino 
+dos correntistas por banco. Os dados mostram uma população média normal, 
+de homens e mulheres, sendo que a fração dos homens maiores que 70 tende
+a ser menor que as mulheres. A distribuição dos distritos é quase a mesma
+da descoberta nos dados das contas, e portanto, continua uniformemente
+distribuída e sem nenhuma característica especial.
+```{r message=FALSE, fig.align='center', fig.height = 3, fig.width = 9}
+currentdate <- as.Date("1998/01/01", format="%Y/%m/%d")
+p1 <- ggplot(client, aes(x = year(currentdate)-year(client$birth_number)))
+p1 <- p1 + geom_histogram(aes(y=..density..), binwidth = 4, colour="black", fill="white")
+p1 <- p1 + geom_density(alpha=0.8)
+p1 <- p1 + facet_grid(. ~ sex)
+p1 <- p1 + ylab("Density") + xlab("Client Age in Years")
+
+p2 <- ggplot(client, aes(x = district_id))
+p2 <- p2 + stat_bin(bins = 20)
+p2 <- p2 + geom_histogram()
+grid.arrange(p1, p2, ncol=2)
+```
+
+### Base de dados Disposition
+
+```{r}
+str(disp)
+```
+
+Disposition é basicamente um relacionamento entre correntistas e suas 
+contas bancarias. A aspecto mais interessante é que alguns desses relacionamentos
+indicam disposition como "dono" que pode emitir transferencias bancarias e
+pedir emprestimos. Vamos transformar esse campo em uma variavel 
+categorica (factor) e plotar a diferença de frequencias entre owners e disponent.
+Como podemos perceber na figura, a quantidade de "dono" chega acima de 80\%.
+
+```{r message=FALSE, fig.align='center', fig.height = 3, fig.width = 4}
+disp$type <- as.factor(disp$type)
+p1 <- ggplot(disp, aes(x = type))
+p1 <- p1 + geom_bar(aes(y = (..count..)/sum(..count..)))
+p1 + scale_y_continuous("percent")
+```
+
+### Base de dados Credit Card
+
+Os cartões de crédito emitidos pelos bancos vinculados a contas bancárias.
+Esses podem ser de tres tipos, junior, classic e gold. Uma variavel categorica
+e portanto precisamos converte-la para factor, e também precisamos limpar 
+o formato data, para entender por quanto tempo de existencia de um determinado 
+cartão. 
+
+```{r}
+card$type <- as.factor(card$type)
+card$issued <- paste0("19", card$issued)
+card$issued <- as.Date(card$issued, "%Y%m%d")
+old.digits <- options('digits')
+options(digits=2)
+tmp <- table(card$type)
+prop.table(tmp)
+```
+
+```{r}
+card_time <- card %>%
+	group_by(year = year(issued), type) %>%
+	summarise(total = n())
+```
+
+```{r message=FALSE, fig.align='center', fig.height = 4, fig.width = 6}
+ggplot(card_time, aes(x=year, y=total, fill=type)) +
+	    geom_bar(stat="identity", position=position_dodge())
+```
+
+### Base de dados Loan
+
+```{r}
+str(loan)
+```
+
+Os emprestimos tem informações muito uteis para ajudar a classificação dos 
+correntistas para oferecimento de cartões de crédito e/ou outros 
+emprestimos. É usando essa informação que podemos detectar bons
+pagadores e maus pagadores. Bem como ver o volume e o tempo médio dos 
+empréstimos. O dataframe contém alguns campos para adequação, como por
+exemplo, o campo status é do tipo categórico e precisamos defini-lo como
+factor. Também precisamos fixar as datas no formato correto.
+
+```{r}
+loan$status <- as.factor(loan$status)
+loan$date <- paste0("19", loan$date)
+loan$date <- as.Date(loan$date, "%Y%m%d")
+head(loan)
+```
+
+Podemos observar algumas variáveis e suas distribuições.
+```{r}
+old.digits <- options('digits')
+options(digits=2)
+tmp <- table(loan$status)
+prop.table(tmp)
+```
+
 Vamos pensar num teste de hipótese que podemos propor para o dono do banco.
 Um case que o pessoal está usando é para análise de crédito. 
 Mas começa lá no banco de Loan, vai a a Account e amarrando com Disposition.
