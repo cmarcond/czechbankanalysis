@@ -222,14 +222,29 @@ loan$date <- as.Date(loan$date, "%Y%m%d")
 head(loan)
 ```
 
-Podemos observar algumas variáveis e suas distribuições.
-```{r}
-old.digits <- options('digits')
-options(digits=2)
-tmp <- table(loan$status)
-prop.table(tmp)
+Podemos observar algumas variáveis e suas distribuições. Começando pelas
+proporções entre A, C e B e D. 
+```{r fig.align='center', fig.height = 4, fig.width = 4}
+p1 <- ggplot(loan, aes(x=status)) 
+p1 <- p1 + geom_bar(aes(y = (..count..)/sum(..count..)))
+p1 + scale_y_continuous("percent")
 ```
 
+Vamos estudar a distribuição dos empréstimos e dos pagamentos por status. 
+Os pontos mostrando as datas de contratação dos empréstimos e seus 
+respectivos valores. 
+
+```{r message=FALSE, fig.align='center', fig.height = 4, fig.width = 9}
+p1 <- ggplot(loan, aes(x=status, y=amount)) 
+p1 <- p1 + geom_boxplot()
+
+p2 <- ggplot(loan, aes(x=date, y=amount, col=status))
+p2 <- p2 + geom_point(alpha=0.5)
+
+grid.arrange(p1, p2, ncol=2)
+```
+
+<!--
 Vamos pensar num teste de hipótese que podemos propor para o dono do banco.
 Um case que o pessoal está usando é para análise de crédito. 
 Mas começa lá no banco de Loan, vai a a Account e amarrando com Disposition.
@@ -382,3 +397,5 @@ str(demograph)
 demograph %>% 
   filter(A1 == 1)
 ```
+
+-->
