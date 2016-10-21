@@ -43,6 +43,7 @@ library(ggplot2)
 library(gridExtra)
 library(lubridate)
 library(scales)
+library(ggmap)
 account <- tbl_df(read.csv("account.asc", 
 		sep = ";", stringsAsFactors = FALSE))
 card <- tbl_df(read.csv("card.asc",
@@ -240,9 +241,37 @@ p1 <- p1 + geom_boxplot()
 
 p2 <- ggplot(loan, aes(x=date, y=amount, col=status))
 p2 <- p2 + geom_point(alpha=0.5)
+p2 <- p2 + stat_smooth(method = "lm")
 
 grid.arrange(p1, p2, ncol=2)
 ```
+
+### Base de dados Demographic
+
+```{r}
+str(district)
+```
+
+Algumas limpezas necessárias são com relação a region" que deve
+indicar determinadas regiões geográficas da Republica Tcheca. 
+```{r}
+district$A3 <- as.factor(district$A3)
+head(district)
+```
+
+
+```{r message=FALSE, fig.align='center', fig.height = 4, fig.width = 9}
+map <- get_map("czech republic", zoom=10)
+p1 <- ggmap(map)
+
+p2 <- ggplot(district, aes(A4, color = A3)) + stat_ecdf(geom = "step")
+p2 <- p2 + xlim(0, 300000)
+grid.arrange(p1, p2, ncol=2)
+```
+
+Os emprestimos tem informações muito uteis para ajudar a classificação dos
+correntistas para oferecimento de cartões de crédito e/ou outros
+emprestimos. É usando essa informação que podemos detectar bons
 
 <!--
 Vamos pensar num teste de hipótese que podemos propor para o dono do banco.
