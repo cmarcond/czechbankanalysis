@@ -56,9 +56,9 @@ district <- tbl_df(read.csv("district.asc",
 		sep = ";", stringsAsFactors = FALSE))  
 loan <- tbl_df(read.csv("loan.asc", 
 		sep = ";", stringsAsFactors = FALSE))
-order <- tbl_df(read.csv("loan.asc",
+order <- tbl_df(read.csv("order.asc",
 		sep = ";", stringsAsFactors = FALSE))
-trans <- tbl_df(read.csv("loan.asc",
+trans <- tbl_df(read.csv("trans.asc",
 		sep = ";", stringsAsFactors = FALSE, nrows=50000)) 
 ```
 
@@ -252,26 +252,127 @@ grid.arrange(p1, p2, ncol=2)
 str(district)
 ```
 
-Algumas limpezas necessárias são com relação a region" que deve
+Algumas limpezas necessárias são com relação a region, tornando-a
+uma variável categórica, que deve
 indicar determinadas regiões geográficas da Republica Tcheca. 
 ```{r}
 district$A3 <- as.factor(district$A3)
 head(district)
 ```
 
+Nós imprimimos o mapa apenas para fins estéticos.
+E podemos realizar a análise das varias variáveis de interesse 
+geográfico como numero de habitantes, salário médio, razão de 
+urbanismo, taxa de desemprego em 96, numero de municipios com 
+mais de 100 mil habitantes.
 
-```{r message=FALSE, fig.align='center', fig.height = 4, fig.width = 9}
+```{r message=FALSE, fig.align='center', fig.height = 3, fig.width = 10}
 map <- get_map("czech republic", zoom=10)
 p1 <- ggmap(map)
 
-p2 <- ggplot(district, aes(A4, color = A3)) + stat_ecdf(geom = "step")
-p2 <- p2 + xlim(0, 300000)
+p2 <- ggplot(district, aes(x = A3, y = A4, fill = A3)) 
+p2 <- p2 + geom_bar(stat="identity", position=position_dodge())
+p2 <- p2 + ylab("inhabitants per region")
+p2 <- p2 + theme(axis.title.x=element_blank(), axis.text.x=element_blank())
+
+p3 <- ggplot(district, aes(x = A3, y = A11, fill = A3)) 
+p3 <- p3 + geom_bar(stat="identity", position=position_dodge())
+p3 <- p3 + ylab("average salary per region")
+p3 <- p3 + theme(axis.title.x=element_blank(), axis.text.x=element_blank())
+grid.arrange(p1, p2, p3, ncol=3)
+```
+
+```{r echo=FALSE, fig.align='center', fig.height = 3, fig.width = 10}
+p1 <- ggplot(district, aes(x = A3, y = A10, fill = A3)) 
+p1 <- p1 + geom_bar(stat="identity", position=position_dodge())
+p1 <- p1 + ylab("ratio of urban inhabitants")
+p1 <- p1 + theme(axis.title.x=element_blank(), axis.text.x=element_blank())
+
+p2 <- ggplot(district, aes(x = A3, y = A13, fill = A3)) 
+p2 <- p2 + geom_bar(stat="identity", position=position_dodge())
+p2 <- p2 + ylab("unemploymant rate 96")
+p2 <- p2 + theme(axis.title.x=element_blank(), axis.text.x=element_blank())
+
+p3 <- ggplot(district, aes(x = A3, y = A8, fill = A3)) 
+p3 <- p3 + geom_bar(stat="identity", position=position_dodge())
+p3 <- p3 + ylab("no. of municipalities with inhabitants >10000")
+p3 <- p3 + theme(axis.title.x=element_blank(), axis.text.x=element_blank())
+grid.arrange(p1, p2, p3, ncol=3)
+```
+
+### Base de dados Order
+
+```{r}
+str(order)
+```
+
+As transferencias bancarias são feitas para diversos bancos de destino.
+Portanto, é possível verificar quantos bancos, quais os valores de 
+transferencia entre bancos e caracterizar as finalidades de "DOC" 
+ou "TED". Faremos algumas limpezas, colocando no simbolo K, uma 
+variavel categória e trocaremos as legendas para ingles 
+de modo a obter melhor entendimento.
+```{r}
+order$bank_to <- as.factor(order$bank_to)
+order$k_symbol <- gsub("SIPO", "household", order$k_symbol)
+order$k_symbol <- gsub("POJISTNE", "insurance", order$k_symbol)
+order$k_symbol <- gsub("LEASING", "leasing", order$k_symbol)
+order$k_symbol <- gsub("UVER", "loan", order$k_symbol)
+order$k_symbol <- gsub(" ", "other", order$k_symbol)
+order$k_symbol <- as.factor(order$k_symbol)
+```
+
+Vamos processar os graficos dos tipos de transferencias por banco.
+E também as quantidades totais de transferencia por banco.
+
+```{r}
+orderbanks <- order %>%
+	group_by(bank_to, k_symbol) %>%
+	summarise(total = n())
+```
+
+```{r message=FALSE, fig.align='center', fig.height = 4, fig.width = 10}
+p1 <- ggplot(orderbanks, aes(x=bank_to, y=total, fill=k_symbol))
+p1 <- p1 + geom_bar(stat="identity", position=position_dodge())
+
+p2 <- ggplot(order, aes(x=bank_to, y=amount, fill=bank_to))
+p2 <- p2 + geom_bar(stat="identity")
 grid.arrange(p1, p2, ncol=2)
 ```
 
-Os emprestimos tem informações muito uteis para ajudar a classificação dos
-correntistas para oferecimento de cartões de crédito e/ou outros
-emprestimos. É usando essa informação que podemos detectar bons
+Os resultados indicam que a maioria das transferencias é pagamento
+de algum tipo de financiamento habitacional ou aluguel, e que os 
+volumes transferidos para outros bancos esta muito proximo um do 
+outro.
+
+### Base de dados Transactions
+
+```{r}
+str(trans)
+```
+
+O ultimo dataset isolado a ser limpado e analisado é o que 
+mostra as transações bancárias. Precisamos limpar as datas, 
+também melhorar os textos das variáveis categóricas como 
+tipo de saque, finalidade da transação bancária.
+
+```{r}
+trans$operation <- gsub("^$", "other", trans$operation)
+trans$k_symbol <- gsub("^$", "other", trans$k_symbol)
+trans$k_symbol <- gsub(" ", "other", trans$k_symbol)
+
+trans$type <- gsub("PRIJEM", "credit", trans$type)
+trans$type <- gsub("VYDAJ", "withdraw", trans$type)
+trans$type <- gsub("VYBER", "withdraw", trans$type)
+trans$type <- as.factor(trans$type)
+
+trans$operation <- gsub("VYBER KARTOU", "credit card withdraw", trans$operation)
+trans$operation <- gsub("VYBER", "cash withdraw", trans$operation)
+trans$operation <- gsub("VKLAD", "credit cash", trans$operation)
+trans$operation <- gsub("PREVOD Z UCTU", "collection bank", trans$operation)
+trans$operation <- gsub("PREVOD NA UCET", "remittance bank", trans$operation)
+trans$operation <- as.factor(trans$operation)
+```
 
 <!--
 Vamos pensar num teste de hipótese que podemos propor para o dono do banco.
