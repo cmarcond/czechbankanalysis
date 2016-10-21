@@ -372,8 +372,61 @@ trans$operation <- gsub("VKLAD", "credit cash", trans$operation)
 trans$operation <- gsub("PREVOD Z UCTU", "collection bank", trans$operation)
 trans$operation <- gsub("PREVOD NA UCET", "remittance bank", trans$operation)
 trans$operation <- as.factor(trans$operation)
+
+trans$k_symbol <- gsub("POJISTNE", "insurance", trans$k_symbol)
+trans$k_symbol <- gsub("SLUZBY", "statement payment", trans$k_symbol)
+trans$k_symbol <- gsub("UROK", "interest", trans$k_symbol)
+trans$k_symbol <- gsub("SANKC.otherinterest", "interest", trans$k_symbol)
+trans$k_symbol <- gsub("SANKC. UROK", "negative balance", trans$k_symbol)
+trans$k_symbol <- gsub("SIPO", "household", trans$k_symbol)
+trans$k_symbol <- gsub("DUCHOD", "old-age pension", trans$k_symbol)
+trans$k_symbol <- gsub("UVER", "loan", trans$k_symbol)
+trans$k_symbol <- as.factor(trans$k_symbol)
+
+trans$date <- paste0("19", trans$date)
+trans$date <- as.Date(trans$date, "%Y%m%d")
 ```
 
+Para fins ilustrativos, plotaremos o desempenho do saldo das contas
+de algumas contas bancárias aleatórias ao longo do tempo. Lembrando 
+que os passos de subida são créditos na conta, e os passos de descida
+são saques (withdraws).
+
+```{r}
+rndaccnt <- sample(trans$account_id, 2)
+rndaccnt
+trans_sample <- trans %>% 
+	group_by(account_id, date) %>% 
+	filter(account_id == rndaccnt[1])
+#head(trans_sample, 20)
+```
+
+```{r echo=FALSE}
+trans_sample2 <- trans %>% 
+	group_by(account_id, date) %>% 
+	filter(account_id == rndaccnt[2])
+```
+
+Agora, temos o gráfico da evolução das 3 contas aleatórias.
+```{r echo=FALSE, fig.align='center', fig.height = 3, fig.width = 10}
+p1 <- ggplot(trans_sample, aes(x = date, y = balance, col = type))
+p1 <- p1 + geom_point()
+p1 <- p1 + stat_smooth(method = "loess", aes(group = 1), 
+             se = F, col = "black")
+p1 <- p1 + theme(legend.position="top")
+
+p2 <- ggplot(trans_sample2, aes(x = date, y = balance, col = type))
+p2 <- p2 + geom_point()
+p2 <- p2 + stat_smooth(method = "loess", aes(group = 1), 
+             se = F, col = "black")
+p2 <- p2 + theme(legend.position="top")
+
+grid.arrange(p1, p2, ncol=2)
+```
+
+Explorando os dados, agrupando por conta e calculando por conta, 
+as quantidades médias de cada variável categórica: insurance, 
+statement, interest, negative, household, pension e loan. 
 <!--
 Vamos pensar num teste de hipótese que podemos propor para o dono do banco.
 Um case que o pessoal está usando é para análise de crédito. 
